@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>F1 Race Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<link rel="stylesheet" href="style.css?v=2" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">F1</span>
+      <span class="brand-word">ANALYTICS</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="laptimes">Lap Times</button>
+      <button class="tab" data-tab="tyres">Tyres &amp; Pit Stops</button>
+      <button class="tab" data-tab="gaps">Gaps &amp; Position</button>
+      <button class="tab" data-tab="sectors">Sectors</button>
+      <button class="tab" data-tab="trackmap">Track Map</button>
+      <button class="tab" data-tab="h2h">Head-to-Head</button>
+      <button class="tab" data-tab="telemetry">Telemetry</button>
+      <button class="tab" data-tab="weather">Weather</button>
+    </nav>
+  </div>
+  <div class="accent-stripe"></div>
+</header>
+
+<section class="control-bar">
+  <div class="control-bar-inner">
+    <div class="control">
+      <label for="selYear">Season</label>
+      <select id="selYear"></select>
+    </div>
+    <div class="control control-wide">
+      <label for="selEvent">Grand Prix</label>
+      <select id="selEvent"></select>
+    </div>
+    <div class="control">
+      <label for="selSession">Session</label>
+      <select id="selSession"></select>
+    </div>
+    <div class="control control-drivers">
+      <label>Drivers</label>
+      <div id="driverPicker" class="driver-picker">Select a session…</div>
+    </div>
+    <button id="loadBtn" class="btn-load">Load Analysis</button>
+  </div>
+</section>
+
+<div id="statusBar" class="status-bar hidden"></div>
+
+<main id="app" class="app hidden">
+
+  <div class="driver-legend" id="driverLegend"></div>
+
+  <section class="panel-section active" id="panel-overview">
+    <div class="hero" id="eventHero"></div>
+    <div class="stat-grid" id="statTiles"></div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Race Classification</h3>
+        <div id="resultsTable" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <h3>Fastest Lap by Driver</h3>
+        <div id="fastestLapChart" class="chart"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-laptimes">
+    <div class="card">
+      <h3>Lap Time Progression</h3>
+      <p class="card-sub">Non-pit laps only. Click a driver chip above to isolate a line.</p>
+      <div id="lapTimeChart" class="chart chart-tall"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Lap Time Distribution</h3>
+        <div id="lapDistChart" class="chart"></div>
+      </div>
+      <div class="card">
+        <h3>Consistency (Lap Time Std. Dev.)</h3>
+        <div id="lapVarChart" class="chart"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-tyres">
+    <div class="grid-2">
+      <div class="card">
+        <h3>Stint Timeline</h3>
+        <div id="stintChart" class="chart"></div>
+      </div>
+      <div class="card">
+        <h3>Tyre Degradation</h3>
+        <p class="card-sub">Average lap time by tyre age, per compound (all selected drivers)</p>
+        <div id="degradationChart" class="chart"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Average Lap Time per Compound</h3>
+        <div id="compoundChart" class="chart"></div>
+      </div>
+      <div class="card">
+        <h3>Pit Stop Duration</h3>
+        <div id="pitDurationChart" class="chart"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Lap Times with Pit Stops Marked</h3>
+      <div id="pitMarkerChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-gaps">
+    <div class="card">
+      <h3>Race Replay</h3>
+      <p class="card-sub">Scrub through the race lap by lap, or hit play to animate the gap and position charts progressively.</p>
+      <div class="scrubber">
+        <button id="scrubPlayBtn" class="btn-load btn-small">&#9654; Play</button>
+        <input type="range" id="scrubSlider" min="1" max="1" value="1" step="1" />
+        <span id="scrubLabel" class="scrub-label">Lap 1</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Gap to Leader</h3>
+      <div id="gapChart" class="chart chart-tall"></div>
+    </div>
+    <div class="card">
+      <h3>Position Over Time</h3>
+      <div id="positionChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-sectors">
+    <div class="card">
+      <h3>Average Sector Times</h3>
+      <div id="sectorChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-trackmap">
+    <div class="card">
+      <h3>Circuit Speed Map</h3>
+      <p class="card-sub">The chosen driver's fastest lap, traced onto the circuit outline and colored by speed or gear.</p>
+      <div class="control-row">
+        <div class="control">
+          <label for="trackDriverSelect">Driver</label>
+          <select id="trackDriverSelect"></select>
+        </div>
+        <div class="control">
+          <label>Color by</label>
+          <div class="toggle-group" id="trackColorToggle">
+            <button class="toggle-btn active" data-mode="speed">Speed</button>
+            <button class="toggle-btn" data-mode="gear">Gear</button>
+          </div>
+        </div>
+        <button id="loadTrackMapBtn" class="btn-load btn-small">Load Track Map</button>
+      </div>
+      <div id="trackMapStatus" class="telemetry-status"></div>
+      <div id="trackMapChart" class="chart chart-square"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-h2h">
+    <div class="card">
+      <h3>Head-to-Head Delta</h3>
+      <p class="card-sub">Cumulative time gained/lost between two drivers' fastest laps, along the lap distance &mdash; the classic broadcast "who's pulling away" graphic.</p>
+      <div class="control-row">
+        <div class="control">
+          <label for="h2hDriver1">Reference</label>
+          <select id="h2hDriver1"></select>
+        </div>
+        <div class="control">
+          <label for="h2hDriver2">Compare</label>
+          <select id="h2hDriver2"></select>
+        </div>
+        <button id="loadH2HBtn" class="btn-load btn-small">Compare</button>
+      </div>
+      <div id="h2hStatus" class="telemetry-status"></div>
+    </div>
+    <div class="card">
+      <h3>Delta Time</h3>
+      <div id="deltaChart" class="chart chart-tall"></div>
+    </div>
+    <div class="card">
+      <h3>Speed Comparison</h3>
+      <div id="h2hSpeedChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-telemetry">
+    <div class="card">
+      <h3>Telemetry — Fastest Lap Comparison</h3>
+      <p class="card-sub">Pick up to 3 drivers to overlay speed / throttle / brake traces. Telemetry is downloaded on demand and can take a moment the first time.</p>
+      <div class="driver-picker" id="telemetryPicker"></div>
+      <button id="loadTelemetryBtn" class="btn-load btn-small">Load Telemetry</button>
+      <div id="telemetryStatus" class="telemetry-status"></div>
+    </div>
+    <div class="card">
+      <h3>Speed Trace</h3>
+      <div id="speedChart" class="chart chart-tall"></div>
+    </div>
+    <div class="card">
+      <h3>Throttle &amp; Brake</h3>
+      <div id="throttleBrakeChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <section class="panel-section" id="panel-weather">
+    <div class="stat-grid" id="weatherTiles"></div>
+    <div class="card">
+      <h3>Track &amp; Air Temperature Over Session</h3>
+      <div id="weatherChart" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  Built with FastF1 &middot; DEV AAT — Formula One EDA project
+</footer>
+
+<script src="app.js?v=2"></script>
+</body>
+</html>
