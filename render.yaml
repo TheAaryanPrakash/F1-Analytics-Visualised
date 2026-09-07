@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: f1-analytics
+    name: f1-analytics-visualised
     env: python
     plan: free
     buildCommand: pip install -r backend/requirements.txt
