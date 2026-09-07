@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 backend/f1_cache/
 .DS_Store
+.claude/

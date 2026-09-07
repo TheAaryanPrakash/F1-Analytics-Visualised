@@ -1,24 +1,34 @@
 :root {
   color-scheme: dark;
-  --page-plane:     #0d0d0d;
+  --page-plane:     #08080a;
   --surface-1:      #16161a;
   --surface-2:      #1c1c21;
+  --surface-glass:  rgba(24, 24, 28, 0.68);
   --text-primary:   #ffffff;
   --text-secondary: #c3c2b7;
   --text-muted:     #898781;
   --gridline:       #2c2c2a;
   --baseline:       #383835;
   --border:         rgba(255,255,255,0.10);
+  --border-hi:      rgba(255,255,255,0.16);
   --accent:         #E10600;
   --accent-dark:    #a30400;
+  --accent-glow:    rgba(225,6,0,0.35);
   --good:           #0ca30c;
   --warning:        #fab219;
   --critical:       #d03b3b;
   --radius: 10px;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-med: 320ms;
 }
 
 * { box-sizing: border-box; }
 
+html {
+  scroll-behavior: smooth;
+}
 html, body {
   margin: 0;
   padding: 0;
@@ -30,13 +40,105 @@ html, body {
 
 h1, h2, h3, h4 { font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
 
+/* ---------- Ambient background: layered glow + film grain ----------
+   Fixed, pointer-events:none, so it never repaints on scroll and never
+   interferes with hit-testing on real UI (per motion/perf skill guidance:
+   blur/noise layers must be fixed, not attached to scrolling content). */
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(760px 520px at 12% -8%, rgba(225,6,0,0.16), transparent 60%),
+    radial-gradient(640px 480px at 108% 12%, rgba(225,6,0,0.10), transparent 55%),
+    radial-gradient(900px 700px at 50% 118%, rgba(255,255,255,0.035), transparent 60%);
+}
+.bg-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Everything that should sit above the ambient layers */
+.topbar, .control-bar, .status-bar, .app, .footer { position: relative; z-index: 1; }
+
+/* ---------- Motion primitives ---------- */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -240px 0; }
+  100% { background-position: 240px 0; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+/* Cards, tiles, podium blocks and legend chips replay their entrance
+   animation every time they're (re)inserted or their panel flips from
+   display:none to block - no JS/IntersectionObserver required, since a
+   `display:none -> block` transition is a fresh paint for CSS animation
+   purposes, and innerHTML-replaced nodes are always fresh elements. */
+.panel-section.active .card { animation: riseIn var(--dur-med) var(--ease-out) backwards; }
+.panel-section.active .grid-2 .card:nth-child(1) { animation-delay: 0ms; }
+.panel-section.active .grid-2 .card:nth-child(2) { animation-delay: 70ms; }
+.stat-grid .stat-tile { animation: popIn var(--dur-med) var(--ease-spring) backwards; }
+.stat-grid .stat-tile:nth-child(1) { animation-delay: 0ms; }
+.stat-grid .stat-tile:nth-child(2) { animation-delay: 45ms; }
+.stat-grid .stat-tile:nth-child(3) { animation-delay: 90ms; }
+.stat-grid .stat-tile:nth-child(4) { animation-delay: 135ms; }
+.stat-grid .stat-tile:nth-child(5) { animation-delay: 180ms; }
+.stat-grid .stat-tile:nth-child(6) { animation-delay: 225ms; }
+.hero .podium-card { animation: popIn var(--dur-med) var(--ease-spring) backwards; }
+.hero .podium-card:nth-child(1) { animation-delay: 0ms; }
+.hero .podium-card:nth-child(2) { animation-delay: 60ms; }
+.hero .podium-card:nth-child(3) { animation-delay: 120ms; }
+.driver-legend .driver-chip { animation: popIn var(--dur-fast) var(--ease-spring) backwards; }
+.driver-legend .driver-chip:nth-child(n) { animation-delay: calc(var(--i, 0) * 30ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Scrollbar & selection ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 8px; border: 2px solid var(--page-plane); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dark); }
+::selection { background: var(--accent-glow); color: #fff; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ---------- Topbar ---------- */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: #111112;
+  background: rgba(17, 17, 18, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--border);
+  animation: riseIn 500ms var(--ease-out);
 }
 .topbar-inner {
   max-width: 1400px;
@@ -54,14 +156,17 @@ h1, h2, h3, h4 { font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
   background: var(--accent);
   padding: 2px 8px;
   clip-path: polygon(8% 0, 100% 0, 92% 100%, 0% 100%);
+  box-shadow: 0 4px 18px var(--accent-glow);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
 }
+.brand:hover .brand-mark { transform: translateY(-1px) scale(1.03); box-shadow: 0 6px 24px var(--accent-glow); }
 .brand-word {
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.18em;
   color: var(--text-secondary);
 }
-.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; position: relative; }
 .tab {
   background: transparent;
   border: none;
@@ -73,19 +178,41 @@ h1, h2, h3, h4 { font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
   padding: 10px 14px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: color .15s, border-color .15s;
+  transition: color var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
   text-transform: uppercase;
+  position: relative;
 }
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text-primary); transform: translateY(-1px); }
+.tab:active { transform: translateY(0) scale(0.97); }
+.tab.active { color: var(--text-primary); }
+/* The real per-tab border is kept transparent once JS takes over -
+   .tab-indicator (below) renders the single sliding underline instead,
+   so there's never a static line + sliding pill visible at once. */
+.tabs.js-ready .tab.active { border-bottom-color: transparent; }
+.tab-indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: transform var(--dur-med) var(--ease-spring), width var(--dur-med) var(--ease-spring), opacity var(--dur-fast);
+  opacity: 0;
+}
 .accent-stripe {
   height: 3px;
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 40%, transparent 40%, transparent 45%, var(--accent) 45%, var(--accent) 100%);
+  background-size: 200% 100%;
 }
 
 /* ---------- Control bar ---------- */
 .control-bar {
-  background: var(--surface-1);
+  background: rgba(22, 22, 26, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
 .control-bar-inner {
@@ -116,7 +243,9 @@ select {
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
+select:hover { border-color: var(--border-hi); }
 select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .driver-picker {
@@ -140,13 +269,16 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-weight: 700;
   font-size: 12.5px;
   color: var(--text-secondary);
-  transition: all .12s;
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), border-color var(--dur-fast), opacity var(--dur-fast), background var(--dur-fast);
   user-select: none;
 }
-.driver-chip .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.driver-chip:hover { transform: translateY(-1px) scale(1.03); background: var(--surface-1); }
+.driver-chip:active { transform: translateY(0) scale(0.96); }
+.driver-chip .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 6px currentColor; }
 .driver-chip.selected {
   color: var(--text-primary);
   background: var(--surface-2);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
 }
 .driver-chip.dashed .dot { border-radius: 2px; }
 
@@ -163,9 +295,12 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   border-radius: 6px;
   cursor: pointer;
   clip-path: polygon(6% 0, 100% 0, 94% 100%, 0% 100%);
-  transition: background .12s;
+  transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
+  box-shadow: 0 4px 16px rgba(225,6,0,0.22);
 }
-.btn-load:hover { background: var(--accent-dark); }
+.btn-load:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 6px 22px rgba(225,6,0,0.32); }
+.btn-load:active { transform: translateY(0) scale(0.98); }
+.btn-load:disabled { opacity: 0.55; cursor: wait; transform: none; box-shadow: none; }
 .btn-small { padding: 8px 16px; font-size: 12px; margin-top: 10px; }
 
 /* ---------- Status ---------- */
@@ -175,6 +310,17 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   padding: 10px 24px;
   font-size: 13px;
   color: var(--text-secondary);
+  position: relative;
+  overflow: hidden;
+}
+.status-bar:not(.hidden):not(.error)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(225,6,0,0.14), transparent);
+  background-size: 240px 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.4s linear infinite;
 }
 .status-bar.error { color: var(--critical); font-weight: 600; }
 .hidden { display: none !important; }
@@ -201,11 +347,19 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 
 .card {
-  background: var(--surface-1);
+  background: linear-gradient(180deg, var(--surface-glass), rgba(22,22,26,0.55));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px 20px 10px;
   margin-bottom: 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px -14px rgba(0,0,0,0.6);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-med), transform var(--dur-med) var(--ease-spring);
+}
+.card:hover {
+  border-color: var(--border-hi);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 40px -16px rgba(225,6,0,0.16), 0 10px 30px -14px rgba(0,0,0,0.65);
 }
 .card:first-child { margin-top: 0; }
 .card-sub { color: var(--text-muted); font-size: 12.5px; margin: 0 0 10px; }
@@ -238,7 +392,9 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-size: 12.5px;
   padding: 9px 16px;
   cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
+.toggle-btn:hover { color: var(--text-primary); }
 .toggle-btn.active { background: var(--accent); color: #fff; }
 
 .scrubber {
@@ -250,6 +406,7 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   flex: 1;
   accent-color: var(--accent);
   height: 4px;
+  cursor: pointer;
 }
 .scrub-label {
   font-weight: 700;
@@ -260,22 +417,40 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ---------- Hero / stat tiles ---------- */
 .hero {
-  background: linear-gradient(135deg, #1a1a1f 0%, #101012 100%);
+  background:
+    radial-gradient(420px 220px at 90% -20%, rgba(225,6,0,0.14), transparent 65%),
+    linear-gradient(135deg, #1a1a1f 0%, #101012 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 22px 26px;
   margin-bottom: 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 34px -18px rgba(0,0,0,0.7);
 }
-.hero .event-name { font-size: 26px; font-weight: 900; }
+.hero .event-name { font-size: 26px; font-weight: 900; letter-spacing: -0.01em; }
 .hero .event-sub { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
 .hero .podium { display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
 .podium-card {
+  position: relative;
   border-left: 4px solid var(--accent);
   background: var(--surface-2);
   padding: 10px 16px;
   border-radius: 4px;
   min-width: 150px;
+  overflow: hidden;
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
 }
+.podium-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(0,0,0,0.6); }
+.podium-card::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 46px; height: 46px;
+  border-radius: 0 4px 0 46px;
+  opacity: 0.16;
+}
+.podium-card:nth-child(1)::after { background: #ffd447; }
+.podium-card:nth-child(2)::after { background: #d7d7d7; }
+.podium-card:nth-child(3)::after { background: #cd8a52; }
 .podium-card .pos { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
 .podium-card .name { font-size: 16px; font-weight: 700; margin-top: 2px; }
 .podium-card .team { font-size: 12px; color: var(--text-secondary); }
@@ -287,17 +462,22 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   margin-bottom: 18px;
 }
 .stat-tile {
-  background: var(--surface-1);
+  background: linear-gradient(180deg, var(--surface-glass), rgba(22,22,26,0.5));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: transform var(--dur-fast) var(--ease-spring), border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
+.stat-tile:hover { transform: translateY(-2px); border-color: var(--border-hi); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 26px -16px rgba(225,6,0,0.2); }
 .stat-tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 700; }
 .stat-tile .value { font-size: 22px; font-weight: 900; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .stat-tile .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
 /* ---------- Table ---------- */
-.table-wrap { max-height: 340px; overflow-y: auto; }
+.table-wrap { max-height: 340px; overflow-y: auto; scroll-behavior: smooth; }
 table.results {
   width: 100%;
   border-collapse: collapse;
@@ -320,8 +500,11 @@ table.results td {
   border-bottom: 1px solid var(--gridline);
   font-variant-numeric: tabular-nums;
 }
+table.results tbody tr { transition: background var(--dur-fast); }
+table.results tbody tr:hover td { background: rgba(255,255,255,0.03); }
 table.results tr.highlight td { background: rgba(225,6,0,0.08); }
-.team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+table.results tr.highlight:hover td { background: rgba(225,6,0,0.13); }
+.team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 5px currentColor; }
 
 .telemetry-status { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
 
@@ -331,3 +514,23 @@ table.results tr.highlight td { background: rgba(225,6,0,0.08); }
   font-size: 12px;
   padding: 24px;
 }
+
+/* ---------- Cursor-follow spotlight ----------
+   Cards/tiles expose --mx/--my (set by a delegated mousemove listener in
+   app.js); the highlight itself is pure CSS so there's no per-frame DOM
+   writes beyond the two custom properties. */
+.card, .stat-tile, .podium-card {
+  --mx: 50%; --my: 50%;
+}
+.card::before, .stat-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--mx) var(--my), rgba(255,255,255,0.05), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--dur-med);
+  pointer-events: none;
+}
+.card, .stat-tile { position: relative; }
+.card:hover::before, .stat-tile:hover::before { opacity: 1; }

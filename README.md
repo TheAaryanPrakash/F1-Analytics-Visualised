@@ -45,8 +45,13 @@ Telemetry tab) is fetched separately and lazily since it's a much heavier downlo
 - **Lap Times** — lap-by-lap progression, distribution (box plot), consistency (std dev)
 - **Tyres & Pit Stops** — stint/strategy timeline, tyre degradation curves, compound
   performance, pit-stop durations, lap times with pit stops marked
-- **Gaps & Position** — gap to race leader per lap, track position over time
+- **Gaps & Position** — gap to race leader per lap, track position over time; a race-replay
+  scrubber lets you step through the session lap by lap or animate it with Play
 - **Sectors** — average sector times per driver
+- **Track Map** — the circuit outline traced with a chosen driver's fastest (or any) lap,
+  colored by speed or gear, with corner numbers
+- **Head-to-Head** — cumulative time delta between two drivers' laps along the lap distance
+  (the classic broadcast "who's pulling away" graphic), plus a speed comparison
 - **Telemetry** — speed trace and throttle/brake overlay for up to 3 drivers' fastest laps
 - **Weather** — track/air temperature, humidity, wind, rainfall
 

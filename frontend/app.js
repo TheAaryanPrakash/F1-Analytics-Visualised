@@ -122,6 +122,57 @@ function computeDashMap(driverCodes, driverMeta) {
   return map;
 }
 
+/* ---------- Motion (purely presentational - never gates data/logic) ---------- */
+// Sliding tab-underline: positions <span class="tab-indicator"> under the
+// active tab. Falls back to a plain CSS transition if anime.js didn't load
+// (e.g. offline/CDN blocked) - the static border-bottom in style.css covers
+// the instant before this ever runs, so there's no broken/invisible state.
+function positionTabIndicator(activeBtn) {
+  const nav = document.getElementById("tabs");
+  const indicator = nav && nav.querySelector(".tab-indicator");
+  if (!indicator || !activeBtn) return;
+  const x = activeBtn.offsetLeft;
+  const y = activeBtn.offsetTop + activeBtn.offsetHeight - 2;
+  indicator.style.width = `${activeBtn.offsetWidth}px`;
+  indicator.style.opacity = "1";
+  if (window.anime) {
+    anime({ targets: indicator, translateX: x, translateY: y, duration: 420, easing: "spring(1, 80, 12, 0)" });
+  } else {
+    indicator.style.transform = `translate(${x}px, ${y}px)`;
+  }
+}
+// Small tactile "pop" for click feedback on elements that persist across the
+// click (i.e. aren't about to be torn down and rebuilt by innerHTML="").
+function pulse(el) {
+  if (!el) return;
+  if (window.anime) {
+    anime({ targets: el, scale: [1, 1.1, 1], duration: 280, easing: "easeOutBack" });
+  } else {
+    el.style.transition = "transform 150ms ease-out";
+    el.style.transform = "scale(1.08)";
+    setTimeout(() => { el.style.transform = ""; }, 150);
+  }
+}
+// Cursor-follow spotlight on cards/tiles: only writes two CSS custom
+// properties (read by a radial-gradient in style.css), throttled to one
+// update per animation frame so it never floods layout/paint.
+function initSpotlight() {
+  let raf = null;
+  let lastEvt = null;
+  document.addEventListener("mousemove", (e) => {
+    lastEvt = e;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = null;
+      const el = lastEvt.target.closest(".card, .stat-tile");
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty("--mx", `${lastEvt.clientX - rect.left}px`);
+      el.style.setProperty("--my", `${lastEvt.clientY - rect.top}px`);
+    });
+  });
+}
+
 /* ---------- Init ---------- */
 document.addEventListener("DOMContentLoaded", init);
 
@@ -129,6 +180,7 @@ async function init() {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+  initSpotlight();
   document.getElementById("loadBtn").addEventListener("click", loadAnalysis);
   document.getElementById("loadTelemetryBtn").addEventListener("click", loadTelemetry);
   document.getElementById("loadTrackMapBtn").addEventListener("click", loadTrackMap);
@@ -148,6 +200,13 @@ async function init() {
     renderGapsPosition();
   });
   document.getElementById("scrubPlayBtn").addEventListener("click", toggleScrubPlayback);
+
+  const tabsNav = document.getElementById("tabs");
+  window.addEventListener("resize", () => positionTabIndicator(document.querySelector(".tab.active")));
+  requestAnimationFrame(() => {
+    tabsNav.classList.add("js-ready");
+    positionTabIndicator(document.querySelector(".tab.active"));
+  });
 
   const { seasons } = await getJSON(`${API}/api/meta/seasons`);
   const selYear = document.getElementById("selYear");
@@ -230,6 +289,8 @@ function renderDriverPicker() {
 function switchTab(tab) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".panel-section").forEach((p) => p.classList.toggle("active", p.id === `panel-${tab}`));
+  positionTabIndicator(document.querySelector(`.tab[data-tab="${tab}"]`));
+  window.scrollTo({ top: 0, behavior: "smooth" }); // land on the new tab's content, not wherever the previous one left off
   window.dispatchEvent(new Event("resize")); // let Plotly resize newly-visible charts
 }
 
@@ -279,11 +340,12 @@ function renderDriverLegend() {
   const legend = document.getElementById("driverLegend");
   legend.innerHTML = "";
   const { drivers, driverMeta } = state.analysis.meta;
-  for (const code of drivers) {
+  drivers.forEach((code, i) => {
     const meta = state.dashMap[code];
     const chip = document.createElement("div");
     chip.className = "driver-chip selected" + (meta.dash !== "solid" ? " dashed" : "");
     chip.style.borderColor = meta.color;
+    chip.style.setProperty("--i", i);
     chip.dataset.driver = code;
     chip.innerHTML = `<span class="dot" style="background:${meta.color}"></span>${code} <span style="color:var(--text-muted); font-weight:400;">${driverMeta[code].team || ""}</span>`;
     chip.addEventListener("click", () => {
@@ -291,10 +353,11 @@ function renderDriverLegend() {
       else state.activeDrivers.add(code);
       chip.classList.toggle("selected", state.activeDrivers.has(code));
       chip.style.opacity = state.activeDrivers.has(code) ? "1" : "0.35";
+      pulse(chip);
       renderAll();
     });
     legend.appendChild(chip);
-  }
+  });
 }
 
 function activeList() {

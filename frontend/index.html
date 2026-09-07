@@ -8,9 +8,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
+
+<div class="bg-glow" aria-hidden="true"></div>
+<div class="bg-grain" aria-hidden="true"></div>
 
 <header class="topbar">
   <div class="topbar-inner">
@@ -28,6 +32,7 @@
       <button class="tab" data-tab="h2h">Head-to-Head</button>
       <button class="tab" data-tab="telemetry">Telemetry</button>
       <button class="tab" data-tab="weather">Weather</button>
+      <span class="tab-indicator" aria-hidden="true"></span>
     </nav>
   </div>
   <div class="accent-stripe"></div>
@@ -231,6 +236,6 @@
   Built with FastF1 &middot; DEV AAT — Formula One EDA project
 </footer>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
