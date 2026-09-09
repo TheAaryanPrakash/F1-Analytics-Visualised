@@ -1,5 +1,7 @@
 # F1 Race Analytics
 
+**Live at [f1-race-analytics-taupe.vercel.app](https://f1-race-analytics-taupe.vercel.app)**
+
 An interactive, F1-website-styled dashboard built on top of the original `Code-1.ipynb`
 exploratory analysis. The notebook's cleaning/analysis logic (lap-time cleaning,
 pit-lap detection, stint/tyre-degradation, gap-to-leader, telemetry) has been
@@ -10,15 +12,22 @@ F1-branded frontend on top.
 
 ```
 Code-1.ipynb          original exploratory notebook (unchanged)
+api/
+  index.py             Vercel entrypoint - re-exports the FastAPI app below
 backend/
   app.py               FastAPI app: REST API + serves the frontend
   analysis.py          FastF1 data loading/cleaning (evolved from the notebook)
   requirements.txt
-  f1_cache/             FastF1's on-disk cache (created automatically)
+  f1_cache/             FastF1's on-disk cache (created automatically; falls
+                         back to a temp dir when the app dir isn't writable,
+                         e.g. on Vercel)
 frontend/
   index.html            page shell, tab layout
   style.css             dark F1-style theme
   app.js                fetches the API, renders Plotly.js charts
+requirements.txt        mirrors backend/requirements.txt - Vercel's Python
+                         runtime expects it at the project root
+vercel.json              routes every request to api/index.py, 90s timeout
 ```
 
 ## Running it
@@ -38,6 +47,25 @@ Pick a season, Grand Prix, and session, choose drivers, and hit **Load Analysis*
 The first load for any session downloads and caches data from FastF1 (can take
 10–60s); subsequent loads of the same session are near-instant. Telemetry (the
 Telemetry tab) is fetched separately and lazily since it's a much heavier download.
+
+## Deploying (Vercel)
+
+The live deployment runs on [Vercel](https://vercel.com)'s free Hobby tier as a
+single Python serverless function (Fluid Compute gives it a 300s ceiling; we cap
+it at 90s in `vercel.json`, well above the documented worst case). There's no
+persistent disk on Vercel, so this deployment intentionally doesn't rely on one -
+see **Caching** below.
+
+```bash
+npx vercel login     # one-time, opens a browser
+npx vercel link       # first time only, links this directory to a Vercel project
+npx vercel --prod
+```
+
+`api/index.py` just re-exports the FastAPI `app` from `backend/app.py` so Vercel's
+Python runtime (which expects functions under `api/`) can find it; no logic lives
+there. `vercel.json` rewrites every path to that one function since the FastAPI
+app does its own internal routing for both `/api/*` and the frontend.
 
 ## What's on the dashboard
 
@@ -61,9 +89,22 @@ labels. Tyre-compound colors follow the FIA standard (soft = red, medium =
 yellow, hard = white, intermediate = green, wet = blue). Click a driver chip in
 the legend to isolate/hide that driver across every chart.
 
+## Caching
+
+FastF1 caches session/lap data to disk (`backend/f1_cache/`, or a temp dir when
+that path isn't writable) and the backend additionally keeps a small in-process
+LRU cache of loaded sessions - both make repeat requests for the same session
+near-instant. Neither is guaranteed to persist: running locally or on a real
+VM/container, the disk cache is durable across restarts; on Vercel, a warm
+function instance reuses both caches for as long as it stays warm, but there's
+no cross-deployment persistence by design (Vercel's writable filesystem is
+`/tmp`-only and ephemeral). This deployment intentionally doesn't try to work
+around that - it's a "call the API when a user requests something" setup, not
+a hot-cache-at-all-costs one.
+
 ## Notes
 
 - Requires internet access on first load per session (FastF1 downloads from the
-  F1 live-timing API); afterwards everything is served from `backend/f1_cache/`.
+  F1 live-timing API).
 - `Code-1.ipynb` is left as-is as the original EDA deliverable; the dashboard is
   an additional, separate presentation layer built from the same analysis.

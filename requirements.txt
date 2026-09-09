@@ -1,0 +1,8 @@
+# Mirrors backend/requirements.txt - Vercel's Python runtime expects
+# requirements.txt at the project root; backend/requirements.txt stays for
+# local dev (README) and the Cloud Run Dockerfile. Keep both in sync.
+fastf1>=3.8
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pandas>=2.0
+numpy>=1.26

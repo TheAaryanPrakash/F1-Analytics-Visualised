@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import os
+import tempfile
 import warnings
 from functools import lru_cache
 from typing import Any
@@ -18,8 +19,18 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+# Prefer a cache dir next to the source (persists across warm instances on a
+# real VM/container). Serverless platforms (Vercel, Lambda) ship a read-only
+# deployment bundle outside of /tmp, so fall back there when the preferred
+# location isn't writable - the cache is then instance-local and ephemeral,
+# which is fine: there's no cross-request persistence guarantee anywhere in
+# this deployment, only within a single warm instance's lifetime.
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "f1_cache")
-os.makedirs(CACHE_DIR, exist_ok=True)
+try:
+    os.makedirs(CACHE_DIR, exist_ok=True)
+except OSError:
+    CACHE_DIR = os.path.join(tempfile.gettempdir(), "f1_cache")
+    os.makedirs(CACHE_DIR, exist_ok=True)
 fastf1.Cache.enable_cache(CACHE_DIR)
 
 SESSION_CODES = ["FP1", "FP2", "FP3", "Q", "SQ", "S", "R"]

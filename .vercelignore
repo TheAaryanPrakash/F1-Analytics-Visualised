@@ -1,8 +1,8 @@
 .venv/
+.git/
+.claude/
 __pycache__/
 *.pyc
 backend/f1_cache/
+Code-1.ipynb
 .DS_Store
-.claude/
-.vercel
-.env*
