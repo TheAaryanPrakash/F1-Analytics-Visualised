@@ -161,11 +161,12 @@ h1, h2, h3, h4 { font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
 }
 .brand:hover .brand-mark { transform: translateY(-1px) scale(1.03); box-shadow: 0 6px 24px var(--accent-glow); }
 .brand-word {
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.18em;
-  color: var(--text-secondary);
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
 }
+.brand-accent { color: var(--accent); }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; position: relative; }
 .tab {
   background: transparent;

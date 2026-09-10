@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 import analysis
 
-app = FastAPI(title="F1 Race Analysis API")
+app = FastAPI(title="verSTATpen API")
 
 app.add_middleware(
     CORSMiddleware,

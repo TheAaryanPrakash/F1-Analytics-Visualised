@@ -1,6 +1,8 @@
-# F1 Race Analytics
+# verSTATpen
 
-**Live at [f1-race-analytics-taupe.vercel.app](https://f1-race-analytics-taupe.vercel.app)**
+*(a play on Max Verstappen + "stat" — an F1 race-analytics dashboard)*
+
+**Live at [verstatpen.vercel.app](https://verstatpen.vercel.app)**
 
 An interactive, F1-website-styled dashboard built on top of the original `Code-1.ipynb`
 exploratory analysis. The notebook's cleaning/analysis logic (lap-time cleaning,
