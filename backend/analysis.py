@@ -118,12 +118,6 @@ def team_color(team: str | None) -> str:
     return TEAM_COLORS.get(team, DEFAULT_TEAM_COLOR)
 
 
-def compound_color(compound: str | None) -> str:
-    if not compound:
-        return "#999999"
-    return COMPOUND_COLORS.get(str(compound).upper(), "#999999")
-
-
 def prepare_driver_laps(laps_df, driver_code: str) -> pd.DataFrame:
     """Clean one driver's laps: lap-time seconds, pit-lap flag, stint-lap counter."""
     df = laps_df.pick_drivers(driver_code).reset_index(drop=True).copy()

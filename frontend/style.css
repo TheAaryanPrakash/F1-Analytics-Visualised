@@ -8,14 +8,11 @@
   --text-secondary: #c3c2b7;
   --text-muted:     #898781;
   --gridline:       #2c2c2a;
-  --baseline:       #383835;
   --border:         rgba(255,255,255,0.10);
   --border-hi:      rgba(255,255,255,0.16);
   --accent:         #E10600;
   --accent-dark:    #a30400;
   --accent-glow:    rgba(225,6,0,0.35);
-  --good:           #0ca30c;
-  --warning:        #fab219;
   --critical:       #d03b3b;
   --radius: 10px;
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -79,10 +76,6 @@ h1, h2, h3, h4 { font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
 @keyframes shimmer {
   0%   { background-position: -240px 0; }
   100% { background-position: 240px 0; }
-}
-@keyframes glowPulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
 }
 
 /* Cards, tiles, podium blocks and legend chips replay their entrance
@@ -544,7 +537,7 @@ table.results tr.highlight:hover td { background: rgba(225,6,0,0.13); }
    Cards/tiles expose --mx/--my (set by a delegated mousemove listener in
    app.js); the highlight itself is pure CSS so there's no per-frame DOM
    writes beyond the two custom properties. */
-.card, .stat-tile, .podium-card {
+.card, .stat-tile {
   --mx: 50%; --my: 50%;
 }
 .card::before, .stat-tile::before {

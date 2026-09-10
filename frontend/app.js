@@ -55,11 +55,6 @@ function fmtLapTime(sec) {
   const s = (sec - m * 60).toFixed(3);
   return `${m}:${s.padStart(6, "0")}`;
 }
-function fmtGap(sec) {
-  if (sec === null || sec === undefined || isNaN(sec)) return "—";
-  const sign = sec > 0 ? "+" : "";
-  return `${sign}${sec.toFixed(3)}s`;
-}
 function fmtNum(v, digits = 1) {
   if (v === null || v === undefined || isNaN(v)) return "—";
   return Number(v).toFixed(digits);

@@ -5,7 +5,6 @@ import os
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import analysis
@@ -33,9 +32,9 @@ async def no_cache_static(request, call_next):
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 
-def _session_or_404(year: int, event: str, session: str, telemetry: bool = False):
+def _session_or_404(year: int, event: str, session: str):
     try:
-        return analysis.load_session(year, event, session, with_telemetry=telemetry)
+        return analysis.load_session(year, event, session)
     except Exception as exc:  # fastf1 raises a variety of exception types
         raise HTTPException(status_code=404, detail=f"Could not load session: {exc}") from exc
 
