@@ -11,8 +11,9 @@ from __future__ import annotations
 import math
 import os
 import tempfile
+import threading
 import warnings
-from functools import lru_cache
+from collections import OrderedDict
 from typing import Any
 
 import fastf1
@@ -95,16 +96,54 @@ def records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return out
 
 
-@lru_cache(maxsize=16)
+# fastf1's on-disk cache (a single shared SQLite file for the HTTP layer,
+# via the fastf1.Cache.enable_cache() call above) isn't safe under
+# concurrent writers - two requests loading data at once can corrupt or
+# truncate each other's cache entries. That corruption doesn't raise where
+# it happens; it surfaces later as FastF1 claiming data "has not been
+# loaded yet" on data that really was requested, which is confusing and was
+# showing up as an intermittent, hard-to-reproduce error. FastAPI runs sync
+# route handlers in a thread pool, so without a lock, concurrent requests
+# (e.g. a user with Telemetry/Track Map/Head-to-Head all loading around the
+# same time) really do race on that shared cache. A single process-wide
+# lock around every fastf1 network/cache call - not a per-key lock - trades
+# a bit of concurrency for correctness: it serializes ALL loads, including
+# for different sessions, because the shared SQLite file is at risk
+# regardless of which session is being fetched. The right trade at this
+# app's scale (personal project, low concurrent traffic).
+_fastf1_io_lock = threading.Lock()
+
+_EVENT_SCHEDULE_CACHE_MAXSIZE = 16
+_event_schedule_cache: "OrderedDict[int, pd.DataFrame]" = OrderedDict()
+
+_SESSION_CACHE_MAXSIZE = 32
+_session_cache: "OrderedDict[tuple[int, str, str, bool], Any]" = OrderedDict()
+
+
 def get_event_schedule(year: int) -> pd.DataFrame:
-    return fastf1.get_event_schedule(year, include_testing=False)
+    with _fastf1_io_lock:
+        if year in _event_schedule_cache:
+            _event_schedule_cache.move_to_end(year)
+            return _event_schedule_cache[year]
+        schedule = fastf1.get_event_schedule(year, include_testing=False)
+        _event_schedule_cache[year] = schedule
+        if len(_event_schedule_cache) > _EVENT_SCHEDULE_CACHE_MAXSIZE:
+            _event_schedule_cache.popitem(last=False)
+        return schedule
 
 
-@lru_cache(maxsize=32)
 def _load_session(year: int, event: str, session_code: str, with_telemetry: bool):
-    session = fastf1.get_session(year, event, session_code)
-    session.load(laps=True, telemetry=with_telemetry, weather=True, messages=False)
-    return session
+    key = (year, event, session_code, with_telemetry)
+    with _fastf1_io_lock:
+        if key in _session_cache:
+            _session_cache.move_to_end(key)
+            return _session_cache[key]
+        session = fastf1.get_session(year, event, session_code)
+        session.load(laps=True, telemetry=with_telemetry, weather=True, messages=False)
+        _session_cache[key] = session
+        if len(_session_cache) > _SESSION_CACHE_MAXSIZE:
+            _session_cache.popitem(last=False)
+        return session
 
 
 def load_session(year: int, event: str, session_code: str, with_telemetry: bool = False):
