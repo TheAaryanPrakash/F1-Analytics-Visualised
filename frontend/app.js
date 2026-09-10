@@ -173,6 +173,56 @@ function initSpotlight() {
   });
 }
 
+// Progress bar driven by actual elapsed time, for the three tabs (Telemetry,
+// Track Map, Head-to-Head) whose backend calls are a single blocking FastF1
+// fetch with no incremental progress to report (10-60s+ on a cold cache per
+// the README). Rather than a spinner that tells the user nothing, the fill
+// asymptotically approaches ~93% - fast at first, slowing the longer it
+// runs - so it keeps visibly moving even on a slow cold load instead of
+// stalling at a fixed percentage, but it never lies about being done: 100%
+// is only ever reached by finish(), gated on the response actually arriving.
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function startProgress(barId) {
+  const bar = document.getElementById(barId);
+  const fill = bar.querySelector(".progress-bar-fill");
+  bar.hidden = false;
+
+  if (REDUCED_MOTION) {
+    fill.style.transform = "scaleX(0.5)";
+    return {
+      finish: () => { fill.style.transform = "scaleX(1)"; setTimeout(() => { bar.hidden = true; fill.style.transform = "scaleX(0)"; }, 300); },
+      fail: () => { bar.hidden = true; fill.style.transform = "scaleX(0)"; },
+    };
+  }
+
+  const start = performance.now();
+  let raf = requestAnimationFrame(function tick(now) {
+    const elapsedSec = (now - start) / 1000;
+    const pct = 0.93 * (1 - Math.exp(-elapsedSec / 6)); // time constant: ~63% of the way to 93% by 6s
+    fill.style.transform = `scaleX(${pct})`;
+    raf = requestAnimationFrame(tick);
+  });
+
+  return {
+    finish() {
+      cancelAnimationFrame(raf);
+      fill.style.transition = "transform 300ms ease-out";
+      fill.style.transform = "scaleX(1)";
+      setTimeout(() => {
+        bar.hidden = true;
+        fill.style.transition = "none";
+        fill.style.transform = "scaleX(0)";
+      }, 400);
+    },
+    fail() {
+      cancelAnimationFrame(raf);
+      bar.hidden = true;
+      fill.style.transition = "none";
+      fill.style.transform = "scaleX(0)";
+    },
+  };
+}
+
 /* ---------- Init ---------- */
 document.addEventListener("DOMContentLoaded", init);
 
@@ -865,6 +915,7 @@ async function loadTelemetry() {
   const btn = document.getElementById("loadTelemetryBtn");
   btn.disabled = true;
   state.telemetryData = {};
+  const progress = startProgress("telemetryProgress");
   for (const code of state.telemetrySelected) {
     statusEl.textContent = `Downloading telemetry for ${code}…`;
     try {
@@ -876,7 +927,12 @@ async function loadTelemetry() {
       statusEl.textContent = `Failed to load telemetry for ${code}: ${err.message}`;
     }
   }
-  statusEl.textContent = `Loaded telemetry for ${Object.keys(state.telemetryData).join(", ")}.`;
+  if (Object.keys(state.telemetryData).length) {
+    progress.finish();
+    statusEl.textContent = `Loaded telemetry for ${Object.keys(state.telemetryData).join(", ")}.`;
+  } else {
+    progress.fail();
+  }
   btn.disabled = false;
   renderTelemetryCharts();
 }
@@ -958,6 +1014,8 @@ function renderTrackAndH2HSelectors() {
   Plotly.purge("h2hSpeedChart");
   document.getElementById("trackMapStatus").textContent = "";
   document.getElementById("h2hStatus").textContent = "";
+  document.getElementById("trackMapProgress").hidden = true;
+  document.getElementById("h2hProgress").hidden = true;
 }
 
 /* ---------- Track Map ---------- */
@@ -967,14 +1025,17 @@ async function loadTrackMap() {
   const btn = document.getElementById("loadTrackMapBtn");
   btn.disabled = true;
   statusEl.textContent = `Loading track map for ${driver}'s fastest lap…`;
+  const progress = startProgress("trackMapProgress");
   try {
     const data = await getJSON(
       `${API}/api/trackmap?year=${state.year}&event=${encodeURIComponent(state.event)}&session=${state.session}&driver=${driver}&lap=fastest`
     );
     state.trackMapData = data;
+    progress.finish();
     statusEl.textContent = `${driver} — lap ${Math.round(data.lapNumber)}, ${fmtLapTime(data.lapTimeSeconds)} (${data.compound || "?"})`;
     renderTrackMapChart();
   } catch (err) {
+    progress.fail();
     statusEl.textContent = `Failed to load: ${err.message}`;
   } finally {
     btn.disabled = false;
@@ -1059,14 +1120,17 @@ async function loadHeadToHead() {
   const btn = document.getElementById("loadH2HBtn");
   btn.disabled = true;
   statusEl.textContent = `Comparing ${driver1} vs ${driver2}…`;
+  const progress = startProgress("h2hProgress");
   try {
     const data = await getJSON(
       `${API}/api/delta?year=${state.year}&event=${encodeURIComponent(state.event)}&session=${state.session}&driver1=${driver1}&driver2=${driver2}`
     );
     state.h2hData = data;
+    progress.finish();
     statusEl.textContent = `${driver1} lap ${Math.round(data.reference.lapNumber)} (${fmtLapTime(data.reference.lapTimeSeconds)}) vs ${driver2} lap ${Math.round(data.compare.lapNumber)} (${fmtLapTime(data.compare.lapTimeSeconds)})`;
     renderHeadToHeadCharts();
   } catch (err) {
+    progress.fail();
     statusEl.textContent = `Failed to load: ${err.message}`;
   } finally {
     btn.disabled = false;
