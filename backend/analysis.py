@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import os
+import shutil
 import tempfile
 import threading
 import warnings
@@ -33,6 +34,32 @@ except OSError:
     CACHE_DIR = os.path.join(tempfile.gettempdir(), "f1_cache")
     os.makedirs(CACHE_DIR, exist_ok=True)
 fastf1.Cache.enable_cache(CACHE_DIR)
+
+# Vercel's /tmp is small and shared with its own per-cold-start dependency
+# install (~100MB+ into /tmp/_vc_deps), and fastf1's cache grows unbounded -
+# every session and telemetry pull a warm instance handles adds more pickled
+# data. Once /tmp genuinely fills up, fastf1's cache writes start failing
+# with OSError: [Errno 28] No space left on device - and fastf1 catches that
+# internally, logs a warning, and just leaves that data category unloaded
+# rather than raising. That's what actually produces the confusing "the
+# data you are trying to access has not been loaded yet" error later, on
+# data that really was requested. Clearing the cache when free space gets
+# low prevents the write failure in the first place; there's no cross-
+# request persistence guarantee on this deployment to lose by doing so (see
+# CACHE_DIR comment above).
+_MIN_FREE_BYTES = 200 * 1024 * 1024  # 200MB safety margin
+
+
+def _ensure_cache_space() -> None:
+    try:
+        free = shutil.disk_usage(CACHE_DIR).free
+    except OSError:
+        return
+    if free < _MIN_FREE_BYTES:
+        shutil.rmtree(CACHE_DIR, ignore_errors=True)
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        fastf1.Cache.enable_cache(CACHE_DIR)
+
 
 SESSION_CODES = ["FP1", "FP2", "FP3", "Q", "SQ", "S", "R"]
 
@@ -138,6 +165,7 @@ def _load_session(year: int, event: str, session_code: str, with_telemetry: bool
         if key in _session_cache:
             _session_cache.move_to_end(key)
             return _session_cache[key]
+        _ensure_cache_space()
         session = fastf1.get_session(year, event, session_code)
         session.load(laps=True, telemetry=with_telemetry, weather=True, messages=False)
         _session_cache[key] = session
